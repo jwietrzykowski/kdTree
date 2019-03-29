@@ -44,7 +44,7 @@ int main(){
 
     // create NNBF class instance and insert
     NNBF* nnbf = new NNBF(mapFiltered, gridSizeTemp);
-
+ 
     // point for which search nearest neighbours
     PointType pointSel;
 
@@ -53,19 +53,23 @@ int main(){
     pointSel.y = 250;
     pointSel.z = 250;
 
+    //number of points to find
     int K = 10;
+    
+    //brute force algorithm with time measurement
+    
     std::vector<int> lastCornerNeighbours(K);
     std::vector<float> pointSearchSqDis(K);
-    //brute force algorithm
+    
     auto start = std::chrono::system_clock::now();
+    
     nnbf->nearestKSearch(pointSel,K,lastCornerNeighbours,pointSearchSqDis,250);
 
     auto end = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_seconds = end-start;
     std::cout << "elapsed time for brute force: " << elapsed_seconds.count() << "s\n";
 
-
-    //KDT Algorithm start
+    //KDT Algorithm with time measurement
 
     std::vector<int> lastCornerNeighbours2(K);
     std::vector<float> pointSearchSqDis2(K);
