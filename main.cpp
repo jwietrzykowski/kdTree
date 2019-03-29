@@ -103,18 +103,25 @@ int main(){
     try
     {   
         // getting results by KDT algorithm
+        std::vector<Point> KDT_results;
+        Point temp_p;
         if ( kdtreeMap->nearestKSearch (pointSel, K, lastCornerNeighbours2, pointSearchSqDis2) > 0 )
         {
             for (size_t i = 0; i < lastCornerNeighbours2.size (); ++i)
-                std::cout << "    "  <<   mapFiltered->points[ lastCornerNeighbours2[i] ].x
-                          << " " << mapFiltered->points[ lastCornerNeighbours2[i] ].y
-                          << " " << mapFiltered->points[ lastCornerNeighbours2[i] ].z
-                          << " (squared distance: " << pointSearchSqDis2[i] << ")" << std::endl;
+            {
+                temp_p.x = mapFiltered->points[ lastCornerNeighbours2[i] ].x;
+                temp_p.y = mapFiltered->points[ lastCornerNeighbours2[i] ].y;
+                temp_p.z = mapFiltered->points[ lastCornerNeighbours2[i] ].z;
+                
+                KDT_results.push_back(temp_p);
+            }   
         }
     }
     catch (const std::exception& e) 
     {
         std::cout << "Failed using KDT algorithm \n";
         std::cout << e.what();
-    }    
+    } 
+    
+    //TODO: comparing results and creating bigger test
 }
