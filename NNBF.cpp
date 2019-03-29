@@ -50,12 +50,13 @@ NNBF::NNBF(pcl::PointCloud<PointType>::Ptr pts, float igridSize) {
 
 }
 
-void NNBF::nearestKSearch(const PointType &_pt, int numPoints, std::vector<int> &nhs, std::vector<float> &sqDist, float maxDist)
+vector<Point> NNBF::nearestKSearch(const PointType &_pt, int numPoints, std::vector<int> &nhs, std::vector<float> &sqDist, float maxDist)
 {
     NNBF::Point pt;
     pt.x = _pt.x;
     pt.y = _pt.y;
     pt.z = _pt.z;
+    
     //calculate indexes to check
     unsigned long xIndexMin,xIndexMax,yIndexMin,yIndexMax,zIndexMin,zIndexMax;
     xIndexMin = (unsigned long)((pt.x-xBeg)/gridSize - maxDist/gridSize);
@@ -64,6 +65,7 @@ void NNBF::nearestKSearch(const PointType &_pt, int numPoints, std::vector<int> 
     xIndexMax = (unsigned long)((pt.x-xBeg)/gridSize + maxDist/gridSize);
     yIndexMax = (unsigned long)((pt.y-yBeg)/gridSize + maxDist/gridSize);
     zIndexMax = (unsigned long)((pt.z-zBeg)/gridSize + maxDist/gridSize);
+    
     //constraints
     if(xIndexMin < 0) xIndexMin = 0;
     if(yIndexMin < 0) yIndexMin = 0;
@@ -71,7 +73,8 @@ void NNBF::nearestKSearch(const PointType &_pt, int numPoints, std::vector<int> 
     if(xIndexMax > xSize) xIndexMax = xSize;
     if(yIndexMax > ySize) yIndexMax = ySize;
     if(zIndexMax > zSize) zIndexMax = zSize;
-    //brute force
+    
+    //brute force search
     unsigned long currentIndex;
     std::vector<pair <unsigned long, float>> V;
     pair <unsigned long, float> IndexDistPair;
@@ -98,14 +101,26 @@ void NNBF::nearestKSearch(const PointType &_pt, int numPoints, std::vector<int> 
     }
     //search for the closest neighbours
     sort(V.begin(), V.end(), compareFunc);
+    
     //print
-    cout<<"The closest neighbours of point: "<<pt.x<<" "<<pt.y<<" "<<pt.z<<" are:"<<endl;
+    if(false)
+    {
+        cout<<"The closest neighbours of point: "<<pt.x<<" "<<pt.y<<" "<<pt.z<<" are:"<<endl;
+        for(int i = 0; i < numPoints; i++)
+        {
+            Point a;
+            a = voxelGrid[V[i].first];
+            cout<<"Point: "<<a.x<<" "<<a.y<<" "<<a.z<<" with squared distance = "<<V[i].second<<endl;
+
+        }
+    }
+    
+    //create results vector
+    std::vector<Point> results;
     for(int i = 0; i < numPoints; i++)
     {
-        Point a;
-        a = voxelGrid[V[i].first];
-        cout<<"Point: "<<a.x<<" "<<a.y<<" "<<a.z<<" with squared distance = "<<V[i].second<<endl;
+        results.push_back(voxelGrid[V[i].first]);
     }
-    //TODO
-    //ADD data to vectors
+    
+    return results;
 }
