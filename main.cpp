@@ -12,77 +12,116 @@
 #include "NNBF.cpp"
 typedef pcl::PointXYZI PointType;
 
+// adds n random points with values 0-max_v to existing map of points 
+pcl::PointCloud<PointType>::Ptr generate_points_map(int numberOfPoints, int max_v)
+{
+    pcl::PointCloud<PointType>::Ptr map(new pcl::PointCloud<PointType>());
+    
+    pcl::PointXYZI temp;
+    for (unsigned i = 0; i < numberOfPoints; i++)
+    {
+        temp.x = max_v * rand () / (RAND_MAX + 1.0f);
+        temp.y = max_v * rand () / (RAND_MAX + 1.0f);
+        temp.z = max_v * rand () / (RAND_MAX + 1.0f);
+        map->points.push_back(temp);
+    }
+    
+    return map;
+}
+
+// filters map to create second map with only one point in each voxel
+pcl::PointCloud<PointType>::Ptr create_filtered_map(pcl::PointCloud<PointType>::Ptr &map, float gridSize)
+{
+    pcl::PointCloud<PointType>::Ptr mapFiltered(new pcl::PointCloud<PointType>());
+    
+    pcl::VoxelGrid<PointType> downSizeFilter;
+    downSizeFilter.setLeafSize(gridSize, gridSize, gridSize);
+    downSizeFilter.setInputCloud(map);
+    downSizeFilter.filter(*mapFiltered);
+    
+    return mapFiltered;
+}
+
+// creates point with random values
+PointType get_random_point(int max_v)
+{
+    PointType rand_p;
+    
+    // assign coordinates
+    rand_p.x = rand() % max_v;
+    rand_p.y = rand() % max_v;
+    rand_p.z = rand() % max_v;
+    
+    return rand_p;
+}
+
 int main(){
     // create a kdTree
     srand (time (NULL));
     pcl::KdTreeFLANN<PointType>::Ptr kdtreeMap(new pcl::KdTreeFLANN<PointType>());
 
-    // map point cloud
-    pcl::PointCloud<PointType>::Ptr map(new pcl::PointCloud<PointType>());
-    pcl::PointCloud<PointType>::Ptr mapFiltered(new pcl::PointCloud<PointType>());
-
-    // insert points to map
-    int numberPoints = 1000; //1 mil
-    pcl::PointXYZI temp;
-    for (unsigned i = 0; i < numberPoints; i++)
-    {
-        temp.x = 1000.0f * rand () / (RAND_MAX + 1.0f);
-        temp.y = 1000.0f * rand () / (RAND_MAX + 1.0f);
-        temp.z = 1000.0f * rand () / (RAND_MAX + 1.0f);
-        map->points.push_back(temp);
-    }
-
-    // voxel filter the map with 0.4 grid size
-    pcl::VoxelGrid<PointType> downSizeFilter;
-    float gridSizeTemp = 10;
-    downSizeFilter.setLeafSize(gridSizeTemp, gridSizeTemp, gridSizeTemp);
-    downSizeFilter.setInputCloud(map);
-    downSizeFilter.filter(*mapFiltered);
+    // create points map
+    int numberOfPoints = 100000;
+    int maxValue = 1000;
+    pcl::PointCloud<PointType>::Ptr map = generate_points_map(numberPoints, maxValue);
+    
+    // voxel filter the map with specyfied grid size
+    float gridSize = 10;
+    pcl::PointCloud<PointType>::Ptr mapFiltered = filterMap(map, gridSize);
 
     // add points to kdTree
     kdtreeMap->setInputCloud(mapFiltered);
 
     // create NNBF class instance and insert
     NNBF* nnbf = new NNBF(mapFiltered, gridSizeTemp);
-
+ 
     // point for which search nearest neighbours
-    PointType pointSel;
+    PointType pointSel = get_random_point(maxValue);    
 
-    // assign coordinates
-    pointSel.x = 250;
-    pointSel.y = 250;
-    pointSel.z = 250;
-
+    // number of points to find
     int K = 10;
+    
+    // brute force algorithm with exceptions handling    
     std::vector<int> lastCornerNeighbours(K);
-    std::vector<float> pointSearchSqDis(K);
-    //brute force algorithm
-    auto start = std::chrono::system_clock::now();
-    nnbf->nearestKSearch(pointSel,K,lastCornerNeighbours,pointSearchSqDis,250);
+    std::vector<float> pointSearchSqDis(K);    
+    try
+    {   
+        // getting results by brute force algorithm
+        std::vector<Point> BF_results = nnbf->nearestKSearch(pointSel,K,lastCornerNeighbours,pointSearchSqDis,250);
+    }
+    catch (const std::exception& e) 
+    {
+        std::cout << "Failed using Brute Force algorithm \n";
+        std::cout << e.what();
+    }
 
-    auto end = std::chrono::system_clock::now();
-    std::chrono::duration<double> elapsed_seconds = end-start;
-    std::cout << "elapsed time for brute force: " << elapsed_seconds.count() << "s\n";
-
-
-    //KDT Algorithm start
+    // KDT Algorithm with exceptions handling
 
     std::vector<int> lastCornerNeighbours2(K);
     std::vector<float> pointSearchSqDis2(K);
 
-    // accept points within 1 m
-    cout<<"KDTREE algorithm"<<endl;
-    start = std::chrono::system_clock::now();
-    if ( kdtreeMap->nearestKSearch (pointSel, K, lastCornerNeighbours2, pointSearchSqDis2) > 0 )
-    {
-        for (size_t i = 0; i < lastCornerNeighbours2.size (); ++i)
-            std::cout << "    "  <<   mapFiltered->points[ lastCornerNeighbours2[i] ].x
-                      << " " << mapFiltered->points[ lastCornerNeighbours2[i] ].y
-                      << " " << mapFiltered->points[ lastCornerNeighbours2[i] ].z
-                      << " (squared distance: " << pointSearchSqDis2[i] << ")" << std::endl;
+    try
+    {   
+        // getting results by KDT algorithm
+        std::vector<Point> KDT_results;
+        Point temp_p;
+        if ( kdtreeMap->nearestKSearch (pointSel, K, lastCornerNeighbours2, pointSearchSqDis2) > 0 )
+        {
+            for (size_t i = 0; i < lastCornerNeighbours2.size (); ++i)
+            {
+                temp_p.x = mapFiltered->points[ lastCornerNeighbours2[i] ].x;
+                temp_p.y = mapFiltered->points[ lastCornerNeighbours2[i] ].y;
+                temp_p.z = mapFiltered->points[ lastCornerNeighbours2[i] ].z;
+                
+                KDT_results.push_back(temp_p);
+            }   
+        }
     }
-
-    end = std::chrono::system_clock::now();
-    elapsed_seconds = end-start;
-    std::cout << "elapsed time for KDT: " << elapsed_seconds.count() << "s\n";
+    catch (const std::exception& e) 
+    {
+        std::cout << "Failed using KDT algorithm \n";
+        std::cout << e.what();
+    } 
+    
+    //TODO: comparing results and creating bigger test
 }
