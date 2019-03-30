@@ -75,53 +75,63 @@ int main(){
     // create NNBF class instance and insert
     NNBF* nnbf = new NNBF(mapFiltered, gridSizeTemp);
 
-    // point for which search nearest neighbours
-    PointType pointSel = get_random_point(maxValue);
-
-    // number of points to find
-    int K = 10;
-
-    // brute force algorithm with exceptions handling    
-    std::vector<int> lastCornerNeighbours(K);
-    std::vector<float> pointSearchSqDis(K);
-    try
+    int number_of_tests = 1000;
+    int number_of_matches = 0;
+    for (int i = 0; i < number_of_tests; i++)
     {
-        // getting results by brute force algorithm
-        std::vector<Point> BF_results = nnbf->nearestKSearch(pointSel,K,lastCornerNeighbours,pointSearchSqDis,250);
-    }
-    catch (const std::exception& e)
-    {
-        std::cout << "Failed using Brute Force algorithm \n";
-        std::cout << e.what();
-    }
+        // point for which search nearest neighbours
+        PointType pointSel = get_random_point(maxValue);
 
-    // KDT Algorithm with exceptions handling
+        // number of points to find
+        int K = 10;
 
-    std::vector<int> lastCornerNeighbours2(K);
-    std::vector<float> pointSearchSqDis2(K);
-
-    try
-    {
-        // getting results by KDT algorithm
-        std::vector<Point> KDT_results;
-        Point temp_p;
-        if ( kdtreeMap->nearestKSearch (pointSel, K, lastCornerNeighbours2, pointSearchSqDis2) > 0 )
+        // brute force algorithm with exceptions handling    
+        std::vector<int> lastCornerNeighbours(K);
+        std::vector<float> pointSearchSqDis(K);
+        try
         {
-            for (size_t i = 0; i < lastCornerNeighbours2.size (); ++i)
-            {
-                temp_p.x = mapFiltered->points[ lastCornerNeighbours2[i] ].x;
-                temp_p.y = mapFiltered->points[ lastCornerNeighbours2[i] ].y;
-                temp_p.z = mapFiltered->points[ lastCornerNeighbours2[i] ].z;
+            // getting results by brute force algorithm
+            std::vector<Point> BF_results = nnbf->nearestKSearch(pointSel,K,lastCornerNeighbours,pointSearchSqDis,250);
+        }
+        catch (const std::exception& e)
+        {
+            std::cout << "Failed using Brute Force algorithm \n";
+            std::cout << e.what();
+        }
 
-                KDT_results.push_back(temp_p);
+        // KDT Algorithm with exceptions handling
+
+        std::vector<int> lastCornerNeighbours2(K);
+        std::vector<float> pointSearchSqDis2(K);
+
+        try
+        {
+            // getting results by KDT algorithm
+            std::vector<Point> KDT_results;
+            Point temp_p;
+            if ( kdtreeMap->nearestKSearch (pointSel, K, lastCornerNeighbours2, pointSearchSqDis2) > 0 )
+            {
+                for (size_t i = 0; i < lastCornerNeighbours2.size (); ++i)
+                {
+                    temp_p.x = mapFiltered->points[ lastCornerNeighbours2[i] ].x;
+                    temp_p.y = mapFiltered->points[ lastCornerNeighbours2[i] ].y;
+                    temp_p.z = mapFiltered->points[ lastCornerNeighbours2[i] ].z;
+
+                    KDT_results.push_back(temp_p);
+                }
             }
         }
-    }
-    catch (const std::exception& e)
-    {
-        std::cout << "Failed using KDT algorithm \n";
-        std::cout << e.what();
-    }
+        catch (const std::exception& e)
+        {
+            std::cout << "Failed using KDT algorithm \n";
+            std::cout << e.what();
+        }
 
-    //TODO: comparing results and creating bigger test
+        // comparing results
+        if (KDT_results == BF_results)
+            number_of_matches++;        
+    }
+    
+    std::cout << "Number of result matches: " << number_of_matches << " of " <<  number_of_tests << "\n";     
+        
 }
