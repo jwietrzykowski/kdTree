@@ -11,6 +11,12 @@ bool compareFunc(pair <unsigned long, float> &a, pair <unsigned long, float> &b)
     return a.second < b.second;
 }
 
+bool operator ==( const NNBF::Point & a, const NNBF::Point & b)
+{
+    if(a.x==b.x && a.y==b.y && a.z == b.z) return true;
+    return false;
+}
+
 NNBF::NNBF(pcl::PointCloud<PointType>::Ptr pts, float igridSize) {
     gridSize = igridSize;
     //searach for min and max (x,y,z) from pts
@@ -59,6 +65,7 @@ vector<NNBF::Point> NNBF::nearestKSearch(const PointType &_pt, int numPoints, st
 
     //calculate indexes to check
     unsigned long xIndexMin,xIndexMax,yIndexMin,yIndexMax,zIndexMin,zIndexMax;
+
     xIndexMin = (unsigned long)((pt.x-xBeg)/gridSize - maxDist/gridSize);
     yIndexMin = (unsigned long)((pt.y-yBeg)/gridSize - maxDist/gridSize);
     zIndexMin = (unsigned long)((pt.z-zBeg)/gridSize - maxDist/gridSize);
@@ -67,9 +74,9 @@ vector<NNBF::Point> NNBF::nearestKSearch(const PointType &_pt, int numPoints, st
     zIndexMax = (unsigned long)((pt.z-zBeg)/gridSize + maxDist/gridSize);
 
     //constraints
-    if(xIndexMin < 0) xIndexMin = 0;
-    if(yIndexMin < 0) yIndexMin = 0;
-    if(zIndexMin < 0) zIndexMin = 0;
+    if(xIndexMin < 0 || xIndexMin >= 2 * xSize) xIndexMin = 0;
+    if(yIndexMin < 0 || yIndexMin >= 2 * ySize) yIndexMin = 0;
+    if(zIndexMin < 0 || zIndexMin >= 2 * zSize) zIndexMin = 0;
     if(xIndexMax > xSize) xIndexMax = xSize;
     if(yIndexMax > ySize) yIndexMax = ySize;
     if(zIndexMax > zSize) zIndexMax = zSize;

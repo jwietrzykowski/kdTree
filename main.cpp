@@ -20,9 +20,9 @@ pcl::PointCloud<PointType>::Ptr generate_points_map(int numberOfPoints, int max_
     pcl::PointXYZI temp;
     for (unsigned i = 0; i < numberOfPoints; i++)
     {
-        temp.x = max_v * rand () / (RAND_MAX + 1.0f);
-        temp.y = max_v * rand () / (RAND_MAX + 1.0f);
-        temp.z = max_v * rand () / (RAND_MAX + 1.0f);
+        temp.x = (float) max_v * rand() / (RAND_MAX + 1.0f);
+        temp.y = (float) max_v * rand() / (RAND_MAX + 1.0f);
+        temp.z = (float) max_v * rand() / (RAND_MAX + 1.0f);
         map->points.push_back(temp);
     }
 
@@ -61,19 +61,19 @@ int main(){
     pcl::KdTreeFLANN<PointType>::Ptr kdtreeMap(new pcl::KdTreeFLANN<PointType>());
 
     // create points map
-    int numberOfPoints = 100000;
+    int numberOfPoints = 1000000;
     int maxValue = 1000;
-    pcl::PointCloud<PointType>::Ptr map = generate_points_map(numberPoints, maxValue);
+    pcl::PointCloud<PointType>::Ptr map = generate_points_map(numberOfPoints, maxValue);
 
-    // voxel filter the map with specyfied grid size
+    // voxel filter the map with specified grid size
     float gridSize = 10;
-    pcl::PointCloud<PointType>::Ptr mapFiltered = filterMap(map, gridSize);
+    pcl::PointCloud<PointType>::Ptr mapFiltered = create_filtered_map(map, gridSize);
 
     // add points to kdTree
     kdtreeMap->setInputCloud(mapFiltered);
 
     // create NNBF class instance and insert
-    NNBF* nnbf = new NNBF(mapFiltered, gridSizeTemp);
+    NNBF* nnbf = new NNBF(mapFiltered, gridSize);
 
     int number_of_tests = 1000;
     int number_of_matches = 0;
@@ -85,13 +85,14 @@ int main(){
         // number of points to find
         int K = 10;
 
-        // brute force algorithm with exceptions handling    
+        // brute force algorithm with exceptions handling
         std::vector<int> lastCornerNeighbours(K);
         std::vector<float> pointSearchSqDis(K);
+        std::vector<NNBF::Point> BF_results;
         try
         {
             // getting results by brute force algorithm
-            std::vector<Point> BF_results = nnbf->nearestKSearch(pointSel,K,lastCornerNeighbours,pointSearchSqDis,250);
+            BF_results = nnbf->nearestKSearch(pointSel,K,lastCornerNeighbours,pointSearchSqDis,250);
         }
         catch (const std::exception& e)
         {
@@ -104,11 +105,11 @@ int main(){
         std::vector<int> lastCornerNeighbours2(K);
         std::vector<float> pointSearchSqDis2(K);
 
+        std::vector<NNBF::Point> KDT_results;
         try
         {
             // getting results by KDT algorithm
-            std::vector<Point> KDT_results;
-            Point temp_p;
+            NNBF::Point temp_p;
             if ( kdtreeMap->nearestKSearch (pointSel, K, lastCornerNeighbours2, pointSearchSqDis2) > 0 )
             {
                 for (size_t i = 0; i < lastCornerNeighbours2.size (); ++i)
@@ -129,9 +130,9 @@ int main(){
 
         // comparing results
         if (KDT_results == BF_results)
-            number_of_matches++;        
+            number_of_matches++;
     }
-    
-    std::cout << "Number of result matches: " << number_of_matches << " of " <<  number_of_tests << "\n";     
-        
+
+    std::cout << "Number of result matches: " << number_of_matches << " of " <<  number_of_tests << "\n";
+
 }
