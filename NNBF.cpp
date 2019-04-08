@@ -20,6 +20,7 @@ bool operator ==( const NNBF::Point & a, const NNBF::Point & b)
 NNBF::NNBF(pcl::PointCloud<PointType>::Ptr pts, float igridSize) {
     gridSize = igridSize;
     //searach for min and max (x,y,z) from pts
+    // TODO Lepiej uzyc numeric_limits<float>::max() i numeric_limits<float>::lowest()
     xBeg = yBeg = zBeg = MAXFLOAT;
     float xMax = -MAXFLOAT;
     float yMax = -MAXFLOAT;
@@ -32,17 +33,21 @@ NNBF::NNBF(pcl::PointCloud<PointType>::Ptr pts, float igridSize) {
         if (yMax < pts->points[i].y) yMax = pts->points[i].y;
         if (zMax < pts->points[i].z) zMax = pts->points[i].z;
     }
+    // TODO Dobrze by bylo przedtem zaokraglic w dol xBeg do wielokrotnosci igridSize
+    // TODO i zaokraglic w gore xMax
     xSize = (unsigned long) ((xMax - xBeg) / igridSize + 1);
     ySize = (unsigned long) ((yMax - yBeg) / igridSize + 1);
     zSize = (unsigned long) ((zMax - zBeg) / igridSize + 1);
 
 
+    // TODO Lepiej od razu pracowac na docelowym wektorze, aby uniknac pozniej kopiowania.
     //create vector with points
     std::vector<Point> voxelGridTemp(xSize * ySize * zSize);
 
     //add points to vector
     unsigned long xIndex, yIndex, zIndex, Index;
     for (unsigned int i = 0; i < pts->points.size(); i++) {
+        // TODO Przy obliczaniu indeksow nie sa uwzgledniane wartosci xBeg
         xIndex = (unsigned long) (pts->points[i].x / igridSize);
         yIndex = (unsigned long) (pts->points[i].y / igridSize);
         zIndex = (unsigned long) (pts->points[i].z / igridSize);
@@ -69,6 +74,7 @@ vector<NNBF::Point> NNBF::nearestKSearch(const PointType &_pt, int numPoints, st
     xIndexMin = (unsigned long)((pt.x-xBeg)/gridSize - maxDist/gridSize);
     yIndexMin = (unsigned long)((pt.y-yBeg)/gridSize - maxDist/gridSize);
     zIndexMin = (unsigned long)((pt.z-zBeg)/gridSize - maxDist/gridSize);
+    // TODO Odpowiednie zaokraglanie w gore moze byc tu potrzebne
     xIndexMax = (unsigned long)((pt.x-xBeg)/gridSize + maxDist/gridSize);
     yIndexMax = (unsigned long)((pt.y-yBeg)/gridSize + maxDist/gridSize);
     zIndexMax = (unsigned long)((pt.z-zBeg)/gridSize + maxDist/gridSize);
@@ -95,6 +101,8 @@ vector<NNBF::Point> NNBF::nearestKSearch(const PointType &_pt, int numPoints, st
             {
                 //if voxel is empty -> skip iteration
                 currentIndex = xSize*ySize * k + xSize * j + i;
+                // TODO Czytelniej byloby dac odwrotny warunek, aby kod ponizej byl wykonywany jesli bedzie on spelniony.
+                // TODO Dodatkowo powinno sie unikac "continue" i "break" ze wzgledu na wydajnosc.
                 if(voxelGrid[currentIndex].flag == 0) continue;
                 //calculate distance
                 xdist = (pt.x-voxelGrid[currentIndex].x)*(pt.x-voxelGrid[currentIndex].x);
@@ -106,6 +114,7 @@ vector<NNBF::Point> NNBF::nearestKSearch(const PointType &_pt, int numPoints, st
             }
         }
     }
+    // TODO Sortowanie moze byc waskim gardlem tego rozwiazania.
     //search for the closest neighbours
     sort(V.begin(), V.end(), compareFunc);
 

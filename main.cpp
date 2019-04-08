@@ -9,6 +9,7 @@
 #include <iostream>
 #include <vector>
 #include <ctime>
+// TODO Tutaj powinien byc dodawany tylko naglowek. Plik .cpp nalezy dodac do plikow zrodlowych w CMakeLists.txt
 #include "NNBF.cpp"
 typedef pcl::PointXYZI PointType;
 
@@ -20,6 +21,7 @@ pcl::PointCloud<PointType>::Ptr generate_points_map(int numberOfPoints, int max_
     pcl::PointXYZI temp;
     for (unsigned i = 0; i < numberOfPoints; i++)
     {
+        // TODO Lepiej uzyc http://www.cplusplus.com/reference/random/?kw=random do losowania wartosci rzeczywistych
         temp.x = (float) max_v * rand() / (RAND_MAX + 1.0f);
         temp.y = (float) max_v * rand() / (RAND_MAX + 1.0f);
         temp.z = (float) max_v * rand() / (RAND_MAX + 1.0f);
@@ -48,6 +50,7 @@ PointType get_random_point(int max_v)
     PointType rand_p;
 
     // assign coordinates
+    // TODO Lepiej uzyc http://www.cplusplus.com/reference/random/?kw=random do losowania wartosci rzeczywistych
     rand_p.x = rand() % max_v;
     rand_p.y = rand() % max_v;
     rand_p.z = rand() % max_v;
@@ -112,6 +115,7 @@ int main(){
             NNBF::Point temp_p;
             if ( kdtreeMap->nearestKSearch (pointSel, K, lastCornerNeighbours2, pointSearchSqDis2) > 0 )
             {
+                // TODO zmienna "i" zakrywa zmienna "i" z szerszego kontekstu
                 for (size_t i = 0; i < lastCornerNeighbours2.size (); ++i)
                 {
                     temp_p.x = mapFiltered->points[ lastCornerNeighbours2[i] ].x;
