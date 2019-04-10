@@ -10,20 +10,20 @@ using namespace std;
 bool compareFunc(pair <unsigned long, float> &a, pair <unsigned long, float> &b) {
     return a.second < b.second;
 }
-
 bool operator ==( const NNBF::Point & a, const NNBF::Point & b)
 {
     if(a.x==b.x && a.y==b.y && a.z == b.z) return true;
     return false;
 }
 
-NNBF::NNBF(pcl::PointCloud<PointType>::Ptr pts, float igridSize) {
+NNBF::NNBF(const pcl::PointCloud<PointType>::ConstPtr &pts, float igridSize)
+{
     gridSize = igridSize;
     //searach for min and max (x,y,z) from pts
-    xBeg = yBeg = zBeg = MAXFLOAT;
-    float xMax = -MAXFLOAT;
-    float yMax = -MAXFLOAT;
-    float zMax = -MAXFLOAT;
+    xBeg = yBeg = zBeg = numeric_limits<float>::max();
+    float xMax = numeric_limits<float>::lowest();
+    float yMax = numeric_limits<float>::lowest();
+    float zMax = numeric_limits<float>::lowest();
     for (unsigned int i = 0; i < pts->points.size(); i++) {
         if (xBeg > pts->points[i].x) xBeg = pts->points[i].x;
         if (yBeg > pts->points[i].y) yBeg = pts->points[i].y;
@@ -32,31 +32,31 @@ NNBF::NNBF(pcl::PointCloud<PointType>::Ptr pts, float igridSize) {
         if (yMax < pts->points[i].y) yMax = pts->points[i].y;
         if (zMax < pts->points[i].z) zMax = pts->points[i].z;
     }
+    // TODO Dobrze by bylo przedtem zaokraglic w dol xBeg do wielokrotnosci igridSize
+    // TODO i zaokraglic w gore xMax
     xSize = (unsigned long) ((xMax - xBeg) / igridSize + 1);
     ySize = (unsigned long) ((yMax - yBeg) / igridSize + 1);
     zSize = (unsigned long) ((zMax - zBeg) / igridSize + 1);
 
-
     //create vector with points
-    std::vector<Point> voxelGridTemp(xSize * ySize * zSize);
+    voxelGrid.resize(xSize * ySize * zSize);
 
     //add points to vector
     unsigned long xIndex, yIndex, zIndex, Index;
     for (unsigned int i = 0; i < pts->points.size(); i++) {
-        xIndex = (unsigned long) (pts->points[i].x / igridSize);
-        yIndex = (unsigned long) (pts->points[i].y / igridSize);
-        zIndex = (unsigned long) (pts->points[i].z / igridSize);
+        // TODO Przy obliczaniu indeksow nie sa uwzgledniane wartosci xBeg
+        xIndex = (unsigned long) ((pts->points[i].x - xBeg)/ igridSize);
+        yIndex = (unsigned long) ((pts->points[i].y - yBeg)/ igridSize);
+        zIndex = (unsigned long) ((pts->points[i].z - zBeg)/ igridSize);
         Index = zIndex * xSize * ySize + yIndex * xSize + xIndex;
-        voxelGridTemp[Index].x = pts->points[i].x;
-        voxelGridTemp[Index].y = pts->points[i].y;
-        voxelGridTemp[Index].z = pts->points[i].z;
-        voxelGridTemp[Index].flag = 1;
+        voxelGrid[Index].x = pts->points[i].x;
+        voxelGrid[Index].y = pts->points[i].y;
+        voxelGrid[Index].z = pts->points[i].z;
+        voxelGrid[Index].flag = 1;
     }
-    voxelGrid = voxelGridTemp;
-
 }
 
-vector<NNBF::Point> NNBF::nearestKSearch(const PointType &_pt, int numPoints, std::vector<int> &nhs, std::vector<float> &sqDist, float maxDist)
+std::vector<NNBF::Point> NNBF::nearestKSearch(const PointType &_pt, int numPoints, /*std::vector<int> &nhs, std::vector<float> &sqDist, */float maxDist)
 {
     NNBF::Point pt;
     pt.x = _pt.x;
@@ -66,12 +66,12 @@ vector<NNBF::Point> NNBF::nearestKSearch(const PointType &_pt, int numPoints, st
     //calculate indexes to check
     unsigned long xIndexMin,xIndexMax,yIndexMin,yIndexMax,zIndexMin,zIndexMax;
 
-    xIndexMin = (unsigned long)((pt.x-xBeg)/gridSize - maxDist/gridSize);
-    yIndexMin = (unsigned long)((pt.y-yBeg)/gridSize - maxDist/gridSize);
-    zIndexMin = (unsigned long)((pt.z-zBeg)/gridSize - maxDist/gridSize);
-    xIndexMax = (unsigned long)((pt.x-xBeg)/gridSize + maxDist/gridSize);
-    yIndexMax = (unsigned long)((pt.y-yBeg)/gridSize + maxDist/gridSize);
-    zIndexMax = (unsigned long)((pt.z-zBeg)/gridSize + maxDist/gridSize);
+    xIndexMin = (unsigned long)((pt.x-xBeg - maxDist)/gridSize);
+    yIndexMin = (unsigned long)((pt.y-yBeg - maxDist)/gridSize);
+    zIndexMin = (unsigned long)((pt.z-zBeg - maxDist)/gridSize);
+    xIndexMax = (unsigned long)((pt.x-xBeg + maxDist)/gridSize ) + 1;
+    yIndexMax = (unsigned long)((pt.y-yBeg + maxDist)/gridSize ) + 1;
+    zIndexMax = (unsigned long)((pt.z-zBeg + maxDist)/gridSize ) + 1;
 
     //constraints
     if(xIndexMin < 0 || xIndexMin >= 2 * xSize) xIndexMin = 0;
@@ -95,17 +95,20 @@ vector<NNBF::Point> NNBF::nearestKSearch(const PointType &_pt, int numPoints, st
             {
                 //if voxel is empty -> skip iteration
                 currentIndex = xSize*ySize * k + xSize * j + i;
-                if(voxelGrid[currentIndex].flag == 0) continue;
-                //calculate distance
-                xdist = (pt.x-voxelGrid[currentIndex].x)*(pt.x-voxelGrid[currentIndex].x);
-                ydist = (pt.y-voxelGrid[currentIndex].y)*(pt.y-voxelGrid[currentIndex].y);
-                zdist = (pt.z-voxelGrid[currentIndex].z)*(pt.z-voxelGrid[currentIndex].z);
-                IndexDistPair.first = currentIndex;
-                IndexDistPair.second = xdist+ydist+zdist;
-                V.push_back(IndexDistPair);
+                if(voxelGrid[currentIndex].flag == 1)
+                {
+                    //calculate distance
+                    xdist = (pt.x - voxelGrid[currentIndex].x) * (pt.x - voxelGrid[currentIndex].x);
+                    ydist = (pt.y - voxelGrid[currentIndex].y) * (pt.y - voxelGrid[currentIndex].y);
+                    zdist = (pt.z - voxelGrid[currentIndex].z) * (pt.z - voxelGrid[currentIndex].z);
+                    IndexDistPair.first = currentIndex;
+                    IndexDistPair.second = xdist + ydist + zdist;
+                    V.push_back(IndexDistPair);
+                }
             }
         }
     }
+    // TODO Sortowanie moze byc waskim gardlem tego rozwiazania. ok
     //search for the closest neighbours
     sort(V.begin(), V.end(), compareFunc);
 
