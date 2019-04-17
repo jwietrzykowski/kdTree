@@ -81,7 +81,7 @@ int main(){
     // create NNBF class instance and insert
     NNBF* nnbf = new NNBF(mapFiltered, gridSize);
 
-    int number_of_tests = 100;
+    int number_of_tests = 1000;
     int number_of_matches = 0;
     for (int i = 0; i < number_of_tests; i++)
     {
@@ -118,7 +118,6 @@ int main(){
             NNBF::Point temp_p;
             if ( kdtreeMap->nearestKSearch (pointSel, K, lastCornerNeighbours2, pointSearchSqDis2) > 0 )
             {
-                // TODO zmienna "i" zakrywa zmienna "i" z szerszego kontekstu
                 for (size_t j = 0; j < lastCornerNeighbours2.size (); j++)
                 {
                     temp_p.x = mapFiltered->points[ lastCornerNeighbours2[j] ].x;

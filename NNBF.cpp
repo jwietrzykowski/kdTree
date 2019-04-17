@@ -44,7 +44,6 @@ NNBF::NNBF(const pcl::PointCloud<PointType>::ConstPtr &pts, float igridSize)
     //add points to vector
     unsigned long xIndex, yIndex, zIndex, Index;
     for (unsigned int i = 0; i < pts->points.size(); i++) {
-        // TODO Przy obliczaniu indeksow nie sa uwzgledniane wartosci xBeg
         xIndex = (unsigned long) ((pts->points[i].x - xBeg)/ igridSize);
         yIndex = (unsigned long) ((pts->points[i].y - yBeg)/ igridSize);
         zIndex = (unsigned long) ((pts->points[i].z - zBeg)/ igridSize);
