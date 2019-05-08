@@ -4,16 +4,22 @@
 #include <vector>
 #include <algorithm>
 #include <utility>
-
+#include "math.h"
+#include "queue"
 using namespace std;
 
-bool compareFunc(pair <unsigned long, float> &a, pair <unsigned long, float> &b) {
+//not used anymore
+/*bool compareFunc(pair <unsigned long, float> &a, pair <unsigned long, float> &b) {
     return a.second < b.second;
-}
+}*/
 bool operator ==( const NNBF::Point & a, const NNBF::Point & b)
 {
     if(a.x==b.x && a.y==b.y && a.z == b.z) return true;
     return false;
+}
+//for queue to have "worst" point on top to pop
+bool operator < (pair <unsigned long, float> &a, pair <unsigned long, float> &b){
+    return a.second > b.second;
 }
 
 NNBF::NNBF(const pcl::PointCloud<PointType>::ConstPtr &pts, float igridSize)
@@ -82,6 +88,7 @@ std::vector<NNBF::Point> NNBF::nearestKSearch(const PointType &_pt, int numPoint
 
     //brute force search
     unsigned long currentIndex;
+    //V is a vector with index and distance squared from selected point
     std::vector<pair <unsigned long, float>> V;
     pair <unsigned long, float> IndexDistPair;
     float xdist,ydist,zdist;
@@ -109,26 +116,30 @@ std::vector<NNBF::Point> NNBF::nearestKSearch(const PointType &_pt, int numPoint
     }
     // TODO Sortowanie moze byc waskim gardlem tego rozwiazania. ok
     //search for the closest neighbours
-    sort(V.begin(), V.end(), compareFunc);
-
-    //print
-    if(false)
+    //sort(V.begin(), V.end(), compareFunc);
+    std::priority_queue<pair <unsigned long, float>> Q;
+    for(int i = 0; i < min(int(V.size()),numPoints); i++)
     {
-        cout<<"The closest neighbours of point: "<<pt.x<<" "<<pt.y<<" "<<pt.z<<" are:"<<endl;
-        for(int i = 0; i < numPoints; i++)
+        if(i<numPoints)
         {
-            Point a;
-            a = voxelGrid[V[i].first];
-            cout<<"Point: "<<a.x<<" "<<a.y<<" "<<a.z<<" with squared distance = "<<V[i].second<<endl;
-
+            Q.push(V[i]);
+        }
+        else
+        {
+            if(Q.top().second > V[i].second)
+            {
+                Q.pop();
+                Q.push(V[i]);
+            }
         }
     }
 
     //create results vector
     std::vector<Point> results;
-    for(int i = 0; i < numPoints; i++)
+    for(int i = 0; i < Q.size(); i++)
     {
-        results.push_back(voxelGrid[V[i].first]);
+        results.push_back(voxelGrid[Q.top().first]);
+        Q.pop();
     }
 
     return results;

@@ -10,7 +10,10 @@
 #include <vector>
 #include <ctime>
 #include <random>
-#include "NNBF.cpp"
+#include "NNBF.h"
+#include <fstream>
+
+using namespace std;
 
 typedef pcl::PointXYZI PointType;
 
@@ -31,6 +34,7 @@ pcl::PointCloud<PointType>::Ptr generate_points_map(int numberOfPoints, int max_
 
     return map;
 }
+
 
 // filters map to create second map with only one point in each voxel
 pcl::PointCloud<PointType>::Ptr create_filtered_map(pcl::PointCloud<PointType>::Ptr &map, float gridSize)
@@ -58,21 +62,21 @@ PointType get_random_point(int max_v,std::default_random_engine generator,std::u
     return rand_p;
 }
 
-int main(){
+void TestAlgorithms(int numberOfPoints = 1000000, double minValue = -25, double maxValue = 25,
+                    float gridSize= 10, int K = 10, float Radius = 250)
+{
     // create a kdTree
     srand (time (NULL));
 
     pcl::KdTreeFLANN<PointType>::Ptr kdtreeMap(new pcl::KdTreeFLANN<PointType>());
 
-    // create points map
-    int numberOfPoints = 1000000;
-    double maxValue = 1000;
+    // create map points
     std::default_random_engine generator;
-    std::uniform_real_distribution<double> distribution(100.0,maxValue);
+    std::uniform_real_distribution<double> distribution(minValue,maxValue);
     pcl::PointCloud<PointType>::Ptr map = generate_points_map(numberOfPoints, maxValue, generator, distribution);
 
     // voxel filter the map with specified grid size
-    float gridSize = 10;
+    //float gridSize = 10;
     pcl::PointCloud<PointType>::Ptr mapFiltered = create_filtered_map(map, gridSize);
 
     // add points to kdTree
@@ -81,27 +85,29 @@ int main(){
     // create NNBF class instance and insert
     NNBF* nnbf = new NNBF(mapFiltered, gridSize);
 
-    int number_of_tests = 1000;
-    int number_of_matches = 0;
-    for (int i = 0; i < number_of_tests; i++)
-    {
+    int number_of_tests = 100;
+    /*int number_of_matches = 0;*/
+    double KDTDuration = 0;
+    double NNBFDuration = 0;
+    for (int i = 0; i < number_of_tests; i++) {
         // point for which search nearest neighbours
         PointType pointSel = get_random_point(maxValue, generator, distribution);
 
         // number of points to find
-        int K = 10;
+        //int K = 10;
 
         // brute force algorithm with exceptions handling
         std::vector<int> lastCornerNeighbours(K);
         std::vector<float> pointSearchSqDis(K);
         std::vector<NNBF::Point> BF_results;
-        try
-        {
+        try {
             // getting results by brute force algorithm
-            BF_results = nnbf->nearestKSearch(pointSel,K,250);
+            std::chrono::high_resolution_clock::time_point begin1 = std::chrono::high_resolution_clock::now();
+            BF_results = nnbf->nearestKSearch(pointSel, K, Radius);
+            std::chrono::high_resolution_clock::time_point end1= std::chrono::high_resolution_clock::now();
+            NNBFDuration += std::chrono::duration_cast<std::chrono::nanoseconds>( end1 - begin1 ).count();
         }
-        catch (const std::exception& e)
-        {
+        catch (const std::exception &e) {
             std::cout << "Failed using Brute Force algorithm \n";
             std::cout << e.what();
         }
@@ -112,33 +118,52 @@ int main(){
         std::vector<float> pointSearchSqDis2(K);
 
         std::vector<NNBF::Point> KDT_results;
-        try
-        {
+        try {
             // getting results by KDT algorithm
             NNBF::Point temp_p;
-            if ( kdtreeMap->nearestKSearch (pointSel, K, lastCornerNeighbours2, pointSearchSqDis2) > 0 )
-            {
-                for (size_t j = 0; j < lastCornerNeighbours2.size (); j++)
-                {
-                    temp_p.x = mapFiltered->points[ lastCornerNeighbours2[j] ].x;
-                    temp_p.y = mapFiltered->points[ lastCornerNeighbours2[j] ].y;
-                    temp_p.z = mapFiltered->points[ lastCornerNeighbours2[j] ].z;
+            std::chrono::high_resolution_clock::time_point begin2 = std::chrono::high_resolution_clock::now();
+            if (kdtreeMap->nearestKSearch(pointSel, K, lastCornerNeighbours2, pointSearchSqDis2) > 0) {
+                for (size_t j = 0; j < lastCornerNeighbours2.size(); j++) {
+                    temp_p.x = mapFiltered->points[lastCornerNeighbours2[j]].x;
+                    temp_p.y = mapFiltered->points[lastCornerNeighbours2[j]].y;
+                    temp_p.z = mapFiltered->points[lastCornerNeighbours2[j]].z;
 
                     KDT_results.push_back(temp_p);
                 }
             }
+            std::chrono::high_resolution_clock::time_point end2 = std::chrono::high_resolution_clock::now();
+            KDTDuration += std::chrono::duration_cast<std::chrono::nanoseconds>( end2 - begin2 ).count();
         }
-        catch (const std::exception& e)
-        {
+        catch (const std::exception &e) {
             std::cout << "Failed using KDT algorithm \n";
             std::cout << e.what();
         }
-
-        // comparing results
-        if (KDT_results == BF_results)
-            number_of_matches++;
     }
+    //cout<<"number of points = "<<numberOfPoints<< " min = "<<minValue << " max = "<<maxValue<<endl;
+    //cout<<"grid size = "<<gridSize<<" K = "<<K<<" Radius = "<<Radius<<endl;
 
-    std::cout << "Number of result matches: " << number_of_matches << " of " <<  number_of_tests << "\n";
+    cout<<"KDTDuration: "<<KDTDuration<<endl;
+    cout<<"NNBFDuration: "<<NNBFDuration<<endl;
+}
+
+int main()
+{
+    //numberOfPoint,min,max,gridSize,K,Radius
+    TestAlgorithms(10000,-25,25,0.4,1,1.2);
+    TestAlgorithms(10000,-25,25,0.4,2,1.2);
+    TestAlgorithms(10000,-25,25,0.4,3,1.2);
+    TestAlgorithms(10000,-25,25,0.4,4,1.2);
+    TestAlgorithms(10000,-25,25,0.4,5,1.2);
+    TestAlgorithms(10000,-25,25,0.4,10,1.2);
+    TestAlgorithms(10000,-25,25,0.4,15,1.2);
+    TestAlgorithms(10000,-25,25,0.4,20,1.2);
+    TestAlgorithms(10000,-25,25,0.4,25,1.2);
+    TestAlgorithms(10000,-25,25,0.4,50,1.2);
+    TestAlgorithms(10000,-25,25,0.4,100,1.2);
+    TestAlgorithms(10000,-25,25,0.4,1000,1.2);
+    /*ofstream myfile;
+    myfile.open("tests_results.csv");
+    myfile<<"test";
+    myfile.close();*/
 
 }
