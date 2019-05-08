@@ -9,22 +9,23 @@
 #include <iostream>
 #include <vector>
 #include <ctime>
-// TODO Tutaj powinien byc dodawany tylko naglowek. Plik .cpp nalezy dodac do plikow zrodlowych w CMakeLists.txt
+#include <random>
 #include "NNBF.cpp"
+
 typedef pcl::PointXYZI PointType;
 
-// adds n random points with values 0-max_v to existing map of points 
-pcl::PointCloud<PointType>::Ptr generate_points_map(int numberOfPoints, int max_v)
+// adds n random points with values 0-max_v to existing map of points
+pcl::PointCloud<PointType>::Ptr generate_points_map(int numberOfPoints, int max_v,
+        std::default_random_engine generator, std::uniform_real_distribution<double> distribution)
 {
     pcl::PointCloud<PointType>::Ptr map(new pcl::PointCloud<PointType>());
 
     pcl::PointXYZI temp;
     for (unsigned i = 0; i < numberOfPoints; i++)
     {
-        // TODO Lepiej uzyc http://www.cplusplus.com/reference/random/?kw=random do losowania wartosci rzeczywistych
-        temp.x = (float) max_v * rand() / (RAND_MAX + 1.0f);
-        temp.y = (float) max_v * rand() / (RAND_MAX + 1.0f);
-        temp.z = (float) max_v * rand() / (RAND_MAX + 1.0f);
+        temp.x = distribution(generator);
+        temp.y = distribution(generator);
+        temp.z = distribution(generator);
         map->points.push_back(temp);
     }
 
@@ -45,15 +46,14 @@ pcl::PointCloud<PointType>::Ptr create_filtered_map(pcl::PointCloud<PointType>::
 }
 
 // creates point with random values
-PointType get_random_point(int max_v)
+PointType get_random_point(int max_v,std::default_random_engine generator,std::uniform_real_distribution<double> distribution)
 {
     PointType rand_p;
 
     // assign coordinates
-    // TODO Lepiej uzyc http://www.cplusplus.com/reference/random/?kw=random do losowania wartosci rzeczywistych
-    rand_p.x = rand() % max_v;
-    rand_p.y = rand() % max_v;
-    rand_p.z = rand() % max_v;
+    rand_p.x = distribution(generator);
+    rand_p.y = distribution(generator);
+    rand_p.z = distribution(generator);
 
     return rand_p;
 }
@@ -61,12 +61,15 @@ PointType get_random_point(int max_v)
 int main(){
     // create a kdTree
     srand (time (NULL));
+
     pcl::KdTreeFLANN<PointType>::Ptr kdtreeMap(new pcl::KdTreeFLANN<PointType>());
 
     // create points map
     int numberOfPoints = 1000000;
-    int maxValue = 1000;
-    pcl::PointCloud<PointType>::Ptr map = generate_points_map(numberOfPoints, maxValue);
+    double maxValue = 1000;
+    std::default_random_engine generator;
+    std::uniform_real_distribution<double> distribution(100.0,maxValue);
+    pcl::PointCloud<PointType>::Ptr map = generate_points_map(numberOfPoints, maxValue, generator, distribution);
 
     // voxel filter the map with specified grid size
     float gridSize = 10;
@@ -83,7 +86,7 @@ int main(){
     for (int i = 0; i < number_of_tests; i++)
     {
         // point for which search nearest neighbours
-        PointType pointSel = get_random_point(maxValue);
+        PointType pointSel = get_random_point(maxValue, generator, distribution);
 
         // number of points to find
         int K = 10;
@@ -95,7 +98,7 @@ int main(){
         try
         {
             // getting results by brute force algorithm
-            BF_results = nnbf->nearestKSearch(pointSel,K,lastCornerNeighbours,pointSearchSqDis,250);
+            BF_results = nnbf->nearestKSearch(pointSel,K,250);
         }
         catch (const std::exception& e)
         {
@@ -115,12 +118,11 @@ int main(){
             NNBF::Point temp_p;
             if ( kdtreeMap->nearestKSearch (pointSel, K, lastCornerNeighbours2, pointSearchSqDis2) > 0 )
             {
-                // TODO zmienna "i" zakrywa zmienna "i" z szerszego kontekstu
-                for (size_t i = 0; i < lastCornerNeighbours2.size (); ++i)
+                for (size_t j = 0; j < lastCornerNeighbours2.size (); j++)
                 {
-                    temp_p.x = mapFiltered->points[ lastCornerNeighbours2[i] ].x;
-                    temp_p.y = mapFiltered->points[ lastCornerNeighbours2[i] ].y;
-                    temp_p.z = mapFiltered->points[ lastCornerNeighbours2[i] ].z;
+                    temp_p.x = mapFiltered->points[ lastCornerNeighbours2[j] ].x;
+                    temp_p.y = mapFiltered->points[ lastCornerNeighbours2[j] ].y;
+                    temp_p.z = mapFiltered->points[ lastCornerNeighbours2[j] ].z;
 
                     KDT_results.push_back(temp_p);
                 }
