@@ -10,7 +10,7 @@
 #include <vector>
 #include <ctime>
 #include <random>
-#include "NNBF.cpp"
+#include "NNBF.h"
 #include <fstream>
 
 using namespace std;
@@ -62,8 +62,8 @@ PointType get_random_point(int max_v,std::default_random_engine generator,std::u
     return rand_p;
 }
 
-void TestAlgorithms(int numberOfPoints = 1000000, double minValue = 10, double maxValue = 1000,
-                    float gridSize= 10, int K = 15, float Radius = 250)
+void TestAlgorithms(int numberOfPoints = 1000000, double minValue = -25, double maxValue = 25,
+                    float gridSize= 10, int K = 10, float Radius = 250)
 {
     // create a kdTree
     srand (time (NULL));
@@ -102,10 +102,10 @@ void TestAlgorithms(int numberOfPoints = 1000000, double minValue = 10, double m
         std::vector<NNBF::Point> BF_results;
         try {
             // getting results by brute force algorithm
-            std::chrono::steady_clock::time_point begin1 = std::chrono::steady_clock::now();
+            std::chrono::high_resolution_clock::time_point begin1 = std::chrono::high_resolution_clock::now();
             BF_results = nnbf->nearestKSearch(pointSel, K, Radius);
-            std::chrono::steady_clock::time_point end1= std::chrono::steady_clock::now();
-            NNBFDuration += std::chrono::duration_cast<std::chrono::microseconds>( end1 - begin1 ).count();
+            std::chrono::high_resolution_clock::time_point end1= std::chrono::high_resolution_clock::now();
+            NNBFDuration += std::chrono::duration_cast<std::chrono::nanoseconds>( end1 - begin1 ).count();
         }
         catch (const std::exception &e) {
             std::cout << "Failed using Brute Force algorithm \n";
@@ -121,7 +121,7 @@ void TestAlgorithms(int numberOfPoints = 1000000, double minValue = 10, double m
         try {
             // getting results by KDT algorithm
             NNBF::Point temp_p;
-            std::chrono::steady_clock::time_point begin2 = std::chrono::steady_clock::now();
+            std::chrono::high_resolution_clock::time_point begin2 = std::chrono::high_resolution_clock::now();
             if (kdtreeMap->nearestKSearch(pointSel, K, lastCornerNeighbours2, pointSearchSqDis2) > 0) {
                 for (size_t j = 0; j < lastCornerNeighbours2.size(); j++) {
                     temp_p.x = mapFiltered->points[lastCornerNeighbours2[j]].x;
@@ -131,28 +131,39 @@ void TestAlgorithms(int numberOfPoints = 1000000, double minValue = 10, double m
                     KDT_results.push_back(temp_p);
                 }
             }
-            std::chrono::steady_clock::time_point end2 = std::chrono::steady_clock::now();
-            KDTDuration += std::chrono::duration_cast<std::chrono::microseconds>( end2 - begin2 ).count();
+            std::chrono::high_resolution_clock::time_point end2 = std::chrono::high_resolution_clock::now();
+            KDTDuration += std::chrono::duration_cast<std::chrono::nanoseconds>( end2 - begin2 ).count();
         }
         catch (const std::exception &e) {
             std::cout << "Failed using KDT algorithm \n";
             std::cout << e.what();
         }
     }
-    cout<<"number of points = "<<numberOfPoints<< " min = "<<minValue << " max = "<<maxValue<<endl;
-    cout<<"grid size = "<<gridSize<<" K = "<<K<<" Radius = "<<Radius<<endl;
+    //cout<<"number of points = "<<numberOfPoints<< " min = "<<minValue << " max = "<<maxValue<<endl;
+    //cout<<"grid size = "<<gridSize<<" K = "<<K<<" Radius = "<<Radius<<endl;
 
-    cout<<"NNBFDuration: "<<NNBFDuration<<endl;
     cout<<"KDTDuration: "<<KDTDuration<<endl;
+    cout<<"NNBFDuration: "<<NNBFDuration<<endl;
 }
 
 int main()
 {
     //numberOfPoint,min,max,gridSize,K,Radius
-    TestAlgorithms(10000000,0,5000,15,10,60);
-    ofstream myfile;
+    TestAlgorithms(10000,-25,25,0.4,1,1.2);
+    TestAlgorithms(10000,-25,25,0.4,2,1.2);
+    TestAlgorithms(10000,-25,25,0.4,3,1.2);
+    TestAlgorithms(10000,-25,25,0.4,4,1.2);
+    TestAlgorithms(10000,-25,25,0.4,5,1.2);
+    TestAlgorithms(10000,-25,25,0.4,10,1.2);
+    TestAlgorithms(10000,-25,25,0.4,15,1.2);
+    TestAlgorithms(10000,-25,25,0.4,20,1.2);
+    TestAlgorithms(10000,-25,25,0.4,25,1.2);
+    TestAlgorithms(10000,-25,25,0.4,50,1.2);
+    TestAlgorithms(10000,-25,25,0.4,100,1.2);
+    TestAlgorithms(10000,-25,25,0.4,1000,1.2);
+    /*ofstream myfile;
     myfile.open("tests_results.csv");
     myfile<<"test";
-    myfile.close();
+    myfile.close();*/
 
 }
