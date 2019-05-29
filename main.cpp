@@ -17,8 +17,14 @@ using namespace std;
 
 typedef pcl::PointXYZI PointType;
 
+bool operator ==( const NNBF::Point & a, const NNBF::Point & b)
+{
+    if(a.x==b.x && a.y==b.y && a.z == b.z) return true;
+    return false;
+}
+
 // adds n random points with values 0-max_v to existing map of points
-pcl::PointCloud<PointType>::Ptr generate_points_map(int numberOfPoints, int max_v,
+pcl::PointCloud<PointType>::Ptr generate_points_map(int numberOfPoints,
         std::default_random_engine generator, std::uniform_real_distribution<double> distribution)
 {
     pcl::PointCloud<PointType>::Ptr map(new pcl::PointCloud<PointType>());
@@ -50,7 +56,7 @@ pcl::PointCloud<PointType>::Ptr create_filtered_map(pcl::PointCloud<PointType>::
 }
 
 // creates point with random values
-PointType get_random_point(int max_v,std::default_random_engine generator,std::uniform_real_distribution<double> distribution)
+PointType get_random_point(std::default_random_engine generator,std::uniform_real_distribution<double> distribution)
 {
     PointType rand_p;
 
@@ -67,45 +73,41 @@ void TestAlgorithms(int numberOfPoints = 1000000, double minValue = -25, double 
 {
     // create a kdTree
     srand (time (NULL));
-
+    std::chrono::high_resolution_clock::time_point begin_common = std::chrono::high_resolution_clock::now();
     pcl::KdTreeFLANN<PointType>::Ptr kdtreeMap(new pcl::KdTreeFLANN<PointType>());
 
     // create map points
     std::default_random_engine generator;
     std::uniform_real_distribution<double> distribution(minValue,maxValue);
-    pcl::PointCloud<PointType>::Ptr map = generate_points_map(numberOfPoints, maxValue, generator, distribution);
+    pcl::PointCloud<PointType>::Ptr map = generate_points_map(numberOfPoints, generator, distribution);
 
     // voxel filter the map with specified grid size
-    //float gridSize = 10;
     pcl::PointCloud<PointType>::Ptr mapFiltered = create_filtered_map(map, gridSize);
-
+    std::chrono::high_resolution_clock::time_point end_common = std::chrono::high_resolution_clock::now();
     // add points to kdTree
     kdtreeMap->setInputCloud(mapFiltered);
 
     // create NNBF class instance and insert
     NNBF* nnbf = new NNBF(mapFiltered, gridSize);
 
-    int number_of_tests = 100;
-    /*int number_of_matches = 0;*/
+    int number_of_tests = 10;
     double KDTDuration = 0;
     double NNBFDuration = 0;
+    std::vector<NNBF::Point> KDT_results;
+    std::vector<NNBF::Point> BF_results;
     for (int i = 0; i < number_of_tests; i++) {
         // point for which search nearest neighbours
-        PointType pointSel = get_random_point(maxValue, generator, distribution);
-
-        // number of points to find
-        //int K = 10;
+        PointType pointSel = get_random_point(generator, distribution);
 
         // brute force algorithm with exceptions handling
         std::vector<int> lastCornerNeighbours(K);
         std::vector<float> pointSearchSqDis(K);
-        std::vector<NNBF::Point> BF_results;
         try {
             // getting results by brute force algorithm
             std::chrono::high_resolution_clock::time_point begin1 = std::chrono::high_resolution_clock::now();
             BF_results = nnbf->nearestKSearch(pointSel, K, Radius);
             std::chrono::high_resolution_clock::time_point end1= std::chrono::high_resolution_clock::now();
-            NNBFDuration += std::chrono::duration_cast<std::chrono::nanoseconds>( end1 - begin1 ).count();
+            NNBFDuration += std::chrono::duration_cast<std::chrono::nanoseconds>( end1 - begin1 + end_common - begin_common ).count();
         }
         catch (const std::exception &e) {
             std::cout << "Failed using Brute Force algorithm \n";
@@ -113,11 +115,9 @@ void TestAlgorithms(int numberOfPoints = 1000000, double minValue = -25, double 
         }
 
         // KDT Algorithm with exceptions handling
-
         std::vector<int> lastCornerNeighbours2(K);
         std::vector<float> pointSearchSqDis2(K);
 
-        std::vector<NNBF::Point> KDT_results;
         try {
             // getting results by KDT algorithm
             NNBF::Point temp_p;
@@ -132,23 +132,46 @@ void TestAlgorithms(int numberOfPoints = 1000000, double minValue = -25, double 
                 }
             }
             std::chrono::high_resolution_clock::time_point end2 = std::chrono::high_resolution_clock::now();
-            KDTDuration += std::chrono::duration_cast<std::chrono::nanoseconds>( end2 - begin2 ).count();
+            KDTDuration += std::chrono::duration_cast<std::chrono::nanoseconds>( end2 - begin2 + end_common - begin_common).count();
         }
         catch (const std::exception &e) {
             std::cout << "Failed using KDT algorithm \n";
             std::cout << e.what();
         }
     }
-    //cout<<"number of points = "<<numberOfPoints<< " min = "<<minValue << " max = "<<maxValue<<endl;
-    //cout<<"grid size = "<<gridSize<<" K = "<<K<<" Radius = "<<Radius<<endl;
+    /*cout<<"KDTDuration: "<<KDTDuration<<endl;
+    cout<<"NNBFDuration: "<<NNBFDuration<<endl;*/
 
-    cout<<"KDTDuration: "<<KDTDuration<<endl;
-    cout<<"NNBFDuration: "<<NNBFDuration<<endl;
+    cout<<KDTDuration<<endl;
+    cout<<NNBFDuration<<endl;
 }
 
 int main()
 {
-    //numberOfPoint,min,max,gridSize,K,Radius
+    //numberOfPoint,min,max,
+    //gridSize,K,Radius
+    cout<<"Zmiana liczby punktow"<<endl;
+    TestAlgorithms(1,-25,25,0.4,10, 1.2);
+    TestAlgorithms(10,-25,25,0.4,10,1.2);
+    TestAlgorithms(100,-25,25,0.4,10,1.2);
+    TestAlgorithms(1000,-25,25,0.4,10,1.2);
+    TestAlgorithms(10000,-25,25,0.4,10,1.2);
+    TestAlgorithms(100000,-25,25,0.4,10,1.2);
+    TestAlgorithms(1000000,-25,25,0.4,10,1.2);
+    TestAlgorithms(10000000,-25,25,0.4,10,1.2);
+    //TestAlgorithms(100000000,-25,25,0.4,10,1.2);
+    cout<<"Zmiana rozmiarow przestrzeni"<<endl;
+    TestAlgorithms(10000,-1.2,1.2,0.4,10,1.2);
+    TestAlgorithms(10000,-2.4,2.4,0.4,10,1.2);
+    TestAlgorithms(10000,-3.6,3.6,0.4,10,1.2);
+    TestAlgorithms(10000,-5,5,0.4,10,1.2);
+    TestAlgorithms(10000,-10,10,0.4,10,1.2);
+    TestAlgorithms(10000,-15,15,0.4,10,1.2);
+    TestAlgorithms(10000,-20,20,0.4,10,1.2);
+    TestAlgorithms(10000,-25,25,0.4,10,1.2);
+    TestAlgorithms(10000,-35,35,0.4,10,1.2);
+    TestAlgorithms(10000,-50,50,0.4,10,1.2);
+    cout<<"Zmiana liczby szukanych sasiadow"<<endl;
     TestAlgorithms(10000,-25,25,0.4,1,1.2);
     TestAlgorithms(10000,-25,25,0.4,2,1.2);
     TestAlgorithms(10000,-25,25,0.4,3,1.2);
@@ -161,9 +184,5 @@ int main()
     TestAlgorithms(10000,-25,25,0.4,50,1.2);
     TestAlgorithms(10000,-25,25,0.4,100,1.2);
     TestAlgorithms(10000,-25,25,0.4,1000,1.2);
-    /*ofstream myfile;
-    myfile.open("tests_results.csv");
-    myfile<<"test";
-    myfile.close();*/
-
+    cout<<"KONIEC TESTOW"<<endl;
 }

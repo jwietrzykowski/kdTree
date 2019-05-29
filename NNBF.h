@@ -6,8 +6,13 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 
-typedef pcl::PointXYZI PointType;
+/*bool operator ==( const NNBF::Point & a, const NNBF::Point & b)
+{
+    if(a.x==b.x && a.y==b.y && a.z == b.z) return true;
+    return false;
+}*/
 
+typedef pcl::PointXYZI PointType;
 class NNBF {
 public:
     //NNBF();
