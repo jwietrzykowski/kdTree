@@ -24,7 +24,7 @@ public:
 
     NNBF(const pcl::PointCloud<PointType>::ConstPtr &pts, float igridSize);
 
-    std::vector<NNBF::Point> nearestKSearch(const PointType &pt, int numPoints,/* std::vector<int> &nhs, std::vector<float> &sqDist, */float maxDist = 1.0);
+    std::vector<NNBF::Point> nearestKSearch(const PointType &pt, int numPoints,/* std::vector<int> &nhs, std::vector<float> &sqDist, */float maxDist = 1.0, int sort_method = 0);
 
 private:
 
