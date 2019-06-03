@@ -26,12 +26,12 @@ NNBF::NNBF(const pcl::PointCloud<PointType>::ConstPtr &pts, float igridSize)
     float yMax = numeric_limits<float>::lowest();
     float zMax = numeric_limits<float>::lowest();
     for (unsigned int i = 0; i < pts->points.size(); i++) {
-        if (xBeg > pts->points[i].x) xBeg = pts->points[i].x;
-        if (yBeg > pts->points[i].y) yBeg = pts->points[i].y;
-        if (zBeg > pts->points[i].z) zBeg = pts->points[i].z;
-        if (xMax < pts->points[i].x) xMax = pts->points[i].x;
-        if (yMax < pts->points[i].y) yMax = pts->points[i].y;
-        if (zMax < pts->points[i].z) zMax = pts->points[i].z;
+        if (xBeg > (float)((int)((pts->points[i].x)/gridSize-1))*gridSize) xBeg = (float)((int)((pts->points[i].x)/gridSize-1))*gridSize;
+        if (yBeg > (float)((int)((pts->points[i].y)/gridSize-1))*gridSize) yBeg = (float)((int)((pts->points[i].y)/gridSize-1))*gridSize;
+        if (zBeg > (float)((int)((pts->points[i].z)/gridSize-1))*gridSize) zBeg = (float)((int)((pts->points[i].z)/gridSize-1))*gridSize;
+        if (xMax < (float)((int)((pts->points[i].x)/gridSize))*gridSize) xMax = (float)((int)((pts->points[i].x)/gridSize))*gridSize;
+        if (yMax < (float)((int)((pts->points[i].y)/gridSize))*gridSize) yMax = (float)((int)((pts->points[i].y)/gridSize))*gridSize;
+        if (zMax < (float)((int)((pts->points[i].z)/gridSize))*gridSize) zMax = (float)((int)((pts->points[i].z)/gridSize))*gridSize;
     }
     // TODO Dobrze by bylo przedtem zaokraglic w dol xBeg do wielokrotnosci igridSize
     // TODO i zaokraglic w gore xMax
@@ -52,6 +52,11 @@ NNBF::NNBF(const pcl::PointCloud<PointType>::ConstPtr &pts, float igridSize)
         voxelGrid[Index].x = pts->points[i].x;
         voxelGrid[Index].y = pts->points[i].y;
         voxelGrid[Index].z = pts->points[i].z;
+        if(voxelGrid[Index].flag == 1)
+        {
+            bool ustawiono = 1;
+
+        }
         voxelGrid[Index].flag = 1;
     }
 }
@@ -62,7 +67,7 @@ std::vector<NNBF::Point> NNBF::nearestKSearch(const PointType &_pt, int numPoint
     pt.x = _pt.x;
     pt.y = _pt.y;
     pt.z = _pt.z;
-
+    maxDist += this->gridSize;
     //calculate indexes to check
     unsigned long xIndexMin,xIndexMax,yIndexMin,yIndexMax,zIndexMin,zIndexMax;
 
@@ -102,6 +107,10 @@ std::vector<NNBF::Point> NNBF::nearestKSearch(const PointType &_pt, int numPoint
                     ydist = (pt.y - voxelGrid[currentIndex].y) * (pt.y - voxelGrid[currentIndex].y);
                     zdist = (pt.z - voxelGrid[currentIndex].z) * (pt.z - voxelGrid[currentIndex].z);
                     IndexDistPair.first = xdist + ydist + zdist;
+                    if (IndexDistPair.first < 0.4)
+                    {
+                        int BREAKacx = 1;
+                    }
                     IndexDistPair.second = currentIndex;
                     V.push_back(IndexDistPair);
                 }
@@ -109,18 +118,33 @@ std::vector<NNBF::Point> NNBF::nearestKSearch(const PointType &_pt, int numPoint
         }
     }
     // TODO Sortowanie moze byc waskim gardlem tego rozwiazania. ok
-    std::priority_queue<pair <double, unsigned long>,vector<pair <double, unsigned long>>,Compare> Q;
-    if(numPoints>V.size())numPoints=V.size();
-    for(int i = 0; i < max((int)(V.size()),numPoints); i++)
+    //std::priority_queue<pair <double, unsigned long>,vector<pair <double, unsigned long>>,Compare> Q;
+    vector<pair<double, unsigned long>> Vout;
+
+    //if(numPoints>V.size())numPoints=V.size();
+    for(int i = 0; i < V.size(); i++)
     {
-        Q.push(V[i]);
+        if(i < numPoints)
+        {
+            Vout.push_back(V[i]);
+            //sort(Vout.begin(),Vout.end());
+        }
+        else
+        {
+            sort(Vout.begin(),Vout.end());
+            if(V[i].first < Vout.back().first)
+            {
+                Vout.pop_back();
+                Vout.push_back(V[i]);
+            }
+        }
     }
+    sort(Vout.begin(),Vout.end());
     //create results vector
     std::vector<Point> results;
-    for(int i = 0; i < max((int)(V.size()),numPoints); i++)
+    for(int i = 0; i < Vout.size(); i++)
     {
-        results.push_back(voxelGrid[Q.top().second]);
-        Q.pop();
+        results.push_back(voxelGrid[Vout[i].second]);
     }
 
     return results;
