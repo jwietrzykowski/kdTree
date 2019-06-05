@@ -13,7 +13,7 @@ class Compare
 public:
     bool operator() (const pair <double, unsigned long> &a,const pair <double, unsigned long> &b)
     {
-        return a.first > b.first;
+        return a.first < b.first;
     }
 };
 
@@ -61,7 +61,7 @@ NNBF::NNBF(const pcl::PointCloud<PointType>::ConstPtr &pts, float igridSize)
     }
 }
 
-std::vector<NNBF::Point> NNBF::nearestKSearch(const PointType &_pt, int numPoints, float maxDist)
+std::vector<NNBF::Point> NNBF::nearestKSearch(const PointType &_pt, int numPoints, float maxDist, int sort_method)
 {
     NNBF::Point pt;
     pt.x = _pt.x;
@@ -107,10 +107,6 @@ std::vector<NNBF::Point> NNBF::nearestKSearch(const PointType &_pt, int numPoint
                     ydist = (pt.y - voxelGrid[currentIndex].y) * (pt.y - voxelGrid[currentIndex].y);
                     zdist = (pt.z - voxelGrid[currentIndex].z) * (pt.z - voxelGrid[currentIndex].z);
                     IndexDistPair.first = xdist + ydist + zdist;
-                    if (IndexDistPair.first < 0.4)
-                    {
-                        int BREAKacx = 1;
-                    }
                     IndexDistPair.second = currentIndex;
                     V.push_back(IndexDistPair);
                 }
@@ -118,34 +114,50 @@ std::vector<NNBF::Point> NNBF::nearestKSearch(const PointType &_pt, int numPoint
         }
     }
     // TODO Sortowanie moze byc waskim gardlem tego rozwiazania. ok
-    //std::priority_queue<pair <double, unsigned long>,vector<pair <double, unsigned long>>,Compare> Q;
-    vector<pair<double, unsigned long>> Vout;
 
-    //if(numPoints>V.size())numPoints=V.size();
-    for(int i = 0; i < V.size(); i++)
+    std::vector<Point> results;
+    //queue solution
+    //===============================================================================
+    if(sort_method == 0)
     {
-        if(i < numPoints)
-        {
-            Vout.push_back(V[i]);
-            //sort(Vout.begin(),Vout.end());
-        }
-        else
-        {
-            sort(Vout.begin(),Vout.end());
-            if(V[i].first < Vout.back().first)
-            {
-                Vout.pop_back();
-                Vout.push_back(V[i]);
+        std::priority_queue<pair<double, unsigned long>, vector<pair<double, unsigned long>>, Compare> Qout;
+        for (int i = 0; i < V.size(); i++) {
+            if (i < numPoints) {
+                Qout.push(V[i]);
+            } else {
+                if (V[i].first < Qout.top().first) {
+                    Qout.push(V[i]);
+                    Qout.pop();
+                }
             }
         }
+        int loopsize = Qout.size();
+        for (int i = 0; i < loopsize; i++) {
+            results.push_back(voxelGrid[Qout.top().second]);
+            Qout.pop();
+        }
+        reverse(results.begin(), results.end());
     }
-    sort(Vout.begin(),Vout.end());
-    //create results vector
-    std::vector<Point> results;
-    for(int i = 0; i < Vout.size(); i++)
+    //vector solution
+    //===============================================================================
+    if(sort_method == 1)
     {
-        results.push_back(voxelGrid[Vout[i].second]);
-    }
+        vector<pair<double, unsigned long>> Vout;
+        for (int i = 0; i < V.size(); i++)
+        {
+            Vout.push_back(V[i]);
+        }
+        sort(Vout.begin(), Vout.end());
+        //create results vector
+        for (int i = 0; i < numPoints; i++)
+        {
+            if(i >= Vout.size())
+            {
+                break;
+            }
+            results.push_back(voxelGrid[Vout[i].second]);
 
+        }
+    }
     return results;
 }

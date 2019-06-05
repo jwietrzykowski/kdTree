@@ -56,7 +56,6 @@ pcl::PointCloud<PointType>::Ptr create_filtered_map(pcl::PointCloud<PointType>::
     downSizeFilter.setLeafSize(gridSize, gridSize, gridSize);
     downSizeFilter.setInputCloud(map);
     downSizeFilter.filter(*mapFiltered);
-    //Eigen::Vector4f test = mapFiltered->sensor_origin_;
     chrono::high_resolution_clock::time_point end = chrono::high_resolution_clock::now();
     duration = chrono::duration_cast<chrono::nanoseconds>( end - begin).count();
     return mapFiltered;
@@ -75,21 +74,22 @@ PointType get_random_point(default_random_engine generator,uniform_real_distribu
     return rand_p;
 }
 
-double Test_KDT(int K, vector<NNBF::Point> &resultsVector,pcl::PointCloud<PointType>::Ptr mapFiltered,
-                PointType pointSel)
+vector<double> Test_KDT(int K, vector<NNBF::Point> &resultsVector,pcl::PointCloud<PointType>::Ptr mapFiltered,
+                vector<PointType> pointSelVect)
 {
     //start clock
-    chrono::high_resolution_clock::time_point begin = chrono::high_resolution_clock::now();
+    chrono::high_resolution_clock::time_point begin1 = chrono::high_resolution_clock::now();
     //generate points and filter
     pcl::KdTreeFLANN<PointType>::Ptr kdtreeMap(new pcl::KdTreeFLANN<PointType>());
     kdtreeMap->setInputCloud(mapFiltered);
     vector<int> lastCornerNeighbours2(K);
     vector<float> pointSearchSqDis2(K);
     NNBF::Point temp_p;
-    //chrono::high_resolution_clock::time_point begin = chrono::high_resolution_clock::now();
-    if (kdtreeMap->nearestKSearch(pointSel, K, lastCornerNeighbours2, pointSearchSqDis2) > 0)
+    chrono::high_resolution_clock::time_point begin2 = chrono::high_resolution_clock::now();
+    for(int i = 0; i < pointSelVect.size(); i++)
+    if (kdtreeMap->nearestKSearch(pointSelVect[i], K, lastCornerNeighbours2, pointSearchSqDis2) > 0)
     {
-        for (size_t j = 0; j < kdtreeMap->nearestKSearch(pointSel, K, lastCornerNeighbours2, pointSearchSqDis2); j++)
+        for (size_t j = 0; j < kdtreeMap->nearestKSearch(pointSelVect[i], K, lastCornerNeighbours2, pointSearchSqDis2); j++)
         {
             temp_p.x = mapFiltered->points[lastCornerNeighbours2[j]].x;
             temp_p.y = mapFiltered->points[lastCornerNeighbours2[j]].y;
@@ -100,20 +100,28 @@ double Test_KDT(int K, vector<NNBF::Point> &resultsVector,pcl::PointCloud<PointT
     }
     //end clock
     chrono::high_resolution_clock::time_point end = chrono::high_resolution_clock::now();
-    return chrono::duration_cast<chrono::nanoseconds>( end - begin).count();
+    vector<double> Vout;
+    Vout.push_back(chrono::duration_cast<chrono::nanoseconds>( end - begin1).count());
+    Vout.push_back(chrono::duration_cast<chrono::nanoseconds>( end - begin2).count());
+    return Vout;
 }
 
-double Test_NNBF(int K, float Radius, float gridSize, vector<NNBF::Point> &resultsVector,pcl::PointCloud<PointType>::Ptr mapFiltered,
-                 PointType pointSel)
+vector<double> Test_NNBF(int K, float Radius, float gridSize, vector<NNBF::Point> &resultsVector,pcl::PointCloud<PointType>::Ptr mapFiltered,
+                 vector<PointType> pointSelVect, int sort_method)
 {
     //start clock
-    chrono::high_resolution_clock::time_point begin = chrono::high_resolution_clock::now();
+    chrono::high_resolution_clock::time_point begin1 = chrono::high_resolution_clock::now();
     NNBF* nnbf = new NNBF(mapFiltered, gridSize);
-    //chrono::high_resolution_clock::time_point begin = chrono::high_resolution_clock::now();
-    resultsVector = nnbf->nearestKSearch(pointSel, K, Radius);
+    chrono::high_resolution_clock::time_point begin2 = chrono::high_resolution_clock::now();
+    for(int i = 0; i < pointSelVect.size(); i++)
+    resultsVector = nnbf->nearestKSearch(pointSelVect[i], K, Radius,sort_method);
     //end clock
     chrono::high_resolution_clock::time_point end = chrono::high_resolution_clock::now();
-    return chrono::duration_cast<chrono::nanoseconds>( end - begin).count();
+    vector<double> Vout;
+    Vout.push_back(chrono::duration_cast<chrono::nanoseconds>( end - begin1).count());
+    Vout.push_back(chrono::duration_cast<chrono::nanoseconds>( end - begin2).count());
+    return Vout;
+
 }
 
 int Check_Results(vector<NNBF::Point> &NNBFresults, vector<NNBF::Point> &KDTresults, PointType p)
@@ -141,38 +149,42 @@ int Check_Results(vector<NNBF::Point> &NNBFresults, vector<NNBF::Point> &KDTresu
 }
 
 void TestAlgorithms(int numberOfPoints = 10000, double minValue = -25, double maxValue = 25,
-                    float gridSize= 0.4, int K = 10, float Radius = 1.2)
+                    float gridSize= 0.4, int K = 10, float Radius = 1.2, int sort_method = 0)
 {
     // create a kdTree
     srand (time (NULL));
     default_random_engine generator;
     uniform_real_distribution<double> distribution(minValue,maxValue);
 
-    int number_of_tests = 5;
-    double KDTDuration = 0;
-    double NNBFDuration = 0;
+    int number_of_tests = 1;
+    double KDTDurationFull = 0;
+    double NNBFDurationFull = 0;
+    double KDTDurationPart = 0;
+    double NNBFDurationPart = 0;
     double commonDuration = 0;
     double temp;
     vector<NNBF::Point> KDT_results;
     vector<NNBF::Point> NNBF_results;
-    int correct_points;
+    //int correct_points;
+    int number_of_points = 1000;
+    vector<PointType> pointSelVect;
+    for (int j = 0; j < number_of_points; j++)
+    {
+        pointSelVect.push_back(get_random_point(generator, distribution));
+    }
     for (int i = 0; i < number_of_tests; i++)
     {
-        PointType pointSel = get_random_point(generator,distribution);
-        pcl::PointCloud<PointType>::Ptr map = generate_points_map(numberOfPoints,generator,distribution,temp);
+        pcl::PointCloud<PointType>::Ptr map = generate_points_map(numberOfPoints, generator, distribution, temp);
         commonDuration += temp;
-        pcl::PointCloud<PointType>::Ptr mapFiltered = create_filtered_map(map,0.4,temp);
+        pcl::PointCloud<PointType>::Ptr mapFiltered = create_filtered_map(map, 0.4, temp);
         commonDuration += temp;
-        KDTDuration += Test_KDT(K,KDT_results,mapFiltered,pointSel);
-        NNBFDuration += Test_NNBF(K,Radius,gridSize,NNBF_results,mapFiltered,pointSel);
-        //KDTDuration += commonDuration;
-        //NNBFDuration += commonDuration;
-        correct_points = Check_Results(NNBF_results,KDT_results, pointSel);
+        KDTDurationFull += Test_KDT(K, KDT_results, mapFiltered, pointSelVect)[0];
+        NNBFDurationFull += Test_NNBF(K, Radius, gridSize, NNBF_results, mapFiltered, pointSelVect, sort_method)[0];
+        KDTDurationPart += Test_KDT(K, KDT_results, mapFiltered, pointSelVect)[1];
+        NNBFDurationPart += Test_NNBF(K, Radius, gridSize, NNBF_results, mapFiltered, pointSelVect, sort_method)[1];
+        //correct_points = Check_Results(NNBF_results, KDT_results, pointSelVect);
     }
-    cout<<KDTDuration<<","<<NNBFDuration<<","<< correct_points<<" z " << NNBF_results.size()<<endl;
-    //cout<<NNBFDuration<<endl;
-    //cout<<correct_points<<" z " << NNBF_results.size()<<endl;
-    //cout<<endl;
+    cout << KDTDurationFull << "," << NNBFDurationFull << "," << KDTDurationPart << "," << NNBFDurationPart << "," <<commonDuration /*<< correct_points << " of " << NNBF_results.size() */<< endl;
 }
 
 int main()
@@ -180,6 +192,7 @@ int main()
     //numberOfPoint,min,max,
     //gridSize,K,Radius
     cout<<"Zmiana liczby punktow"<<endl;
+    cout<<"METODA SORTOWANIA: KOLEJKA"<<endl;
     TestAlgorithms(1,-25,25,0.4,10, 1.2);
     TestAlgorithms(10,-25,25,0.4,10,1.2);
     TestAlgorithms(100,-25,25,0.4,10,1.2);
@@ -187,10 +200,10 @@ int main()
     TestAlgorithms(10000,-25,25,0.4,10,1.2);
     TestAlgorithms(100000,-25,25,0.4,10,1.2);
     TestAlgorithms(1000000,-25,25,0.4,10,1.2);
-    //TestAlgorithms(10000000,-25,25,0.4,10,1.2);
-    //TestAlgorithms(100000000,-25,25,0.4,10,1.2);
+    TestAlgorithms(10000000,-25,25,0.4,10,1.2);
+    TestAlgorithms(100000000,-25,25,0.4,10,1.2);
     cout<<"Zmiana rozmiarow przestrzeni"<<endl;
-    /*TestAlgorithms(10000,-1.2,1.2,0.4,10,1.2);
+    TestAlgorithms(10000,-1.2,1.2,0.4,10,1.2);
     TestAlgorithms(10000,-2.4,2.4,0.4,10,1.2);
     TestAlgorithms(10000,-3.6,3.6,0.4,10,1.2);
     TestAlgorithms(10000,-5,5,0.4,10,1.2);
@@ -198,23 +211,66 @@ int main()
     TestAlgorithms(10000,-15,15,0.4,10,1.2);
     TestAlgorithms(10000,-25,25,0.4,10,1.2);
     TestAlgorithms(10000,-35,35,0.4,10,1.2);
-    TestAlgorithms(10000,-50,50,0.4,10,1.2);*/
+    TestAlgorithms(10000,-50,50,0.4,10,1.2);
     cout<<"Zmiana liczby szukanych sasiadow"<<endl;
-    /*TestAlgorithms(1000000,-25,25,0.4,1,1.2);
-    TestAlgorithms(1000000,-25,25,0.4,2,1.2);
-    TestAlgorithms(1000000,-25,25,0.4,3,1.2);
-    TestAlgorithms(1000000,-25,25,0.4,4,1.2);
-    TestAlgorithms(1000000,-25,25,0.4,5,1.2);
-    TestAlgorithms(1000000,-25,25,0.4,10,1.2);
-    TestAlgorithms(1000000,-25,25,0.4,15,1.2);
-    TestAlgorithms(1000000,-25,25,0.4,20,1.2);
-    TestAlgorithms(1000000,-25,25,0.4,25,1.2);
-    TestAlgorithms(1000000,-25,25,0.4,50,1.2);
-    TestAlgorithms(10000000,-25,25,0.4,100,1.2);
-    TestAlgorithms(10000000,-25,25,0.4,500,1.2);
-    TestAlgorithms(1000000,-25,25,0.4,1000,1.2);
-    TestAlgorithms(1000000,-25,25,0.4,2000,1.2);
-    TestAlgorithms(1000000,-25,25,0.4,4000,1.2);
-    TestAlgorithms(1000000,-25,25,0.4,8000,1.2);*/
+    TestAlgorithms(100000,-25,25,0.4,1,1.2);
+    TestAlgorithms(100000,-25,25,0.4,2,1.2);
+    TestAlgorithms(100000,-25,25,0.4,3,1.2);
+    TestAlgorithms(100000,-25,25,0.4,4,1.2);
+    TestAlgorithms(100000,-25,25,0.4,5,1.2);
+    TestAlgorithms(100000,-25,25,0.4,10,1.2);
+    TestAlgorithms(100000,-25,25,0.4,15,1.2);
+    TestAlgorithms(100000,-25,25,0.4,20,1.2);
+    TestAlgorithms(100000,-25,25,0.4,25,1.2);
+    TestAlgorithms(100000,-25,25,0.4,50,1.2);
+    TestAlgorithms(100000,-25,25,0.4,100,1.2);
+    TestAlgorithms(100000,-25,25,0.4,200,1.2);
+    TestAlgorithms(100000,-25,25,0.4,350,1.2);
+    TestAlgorithms(100000,-25,25,0.4,500,1.2);
+    //TestAlgorithms(100000,-25,25,0.4,1000,1.2);
+    //TestAlgorithms(100000,-25,25,0.4,2000,1.2);
+    //TestAlgorithms(100000,-25,25,0.4,4000,1.2);
+    //TestAlgorithms(100000,-25,25,0.4,8000,1.2);
+
+    cout<<"METODA SORTOWANIA: WEKTOR"<<endl;
+    cout<<"Zmiana liczby punktow"<<endl;
+    TestAlgorithms(1,-25,25,0.4,10, 1.2 ,1);
+    TestAlgorithms(10,-25,25,0.4,10,1.2 ,1);
+    TestAlgorithms(100,-25,25,0.4,10,1.2 ,1);
+    TestAlgorithms(1000,-25,25,0.4,10,1.2 ,1);
+    TestAlgorithms(10000,-25,25,0.4,10,1.2 ,1);
+    TestAlgorithms(100000,-25,25,0.4,10,1.2 ,1);
+    TestAlgorithms(1000000,-25,25,0.4,10,1.2 ,1);
+    TestAlgorithms(10000000,-25,25,0.4,10,1.2 ,1);
+    TestAlgorithms(100000000,-25,25,0.4,10,1.2 ,1);
+    cout<<"Zmiana rozmiarow przestrzeni"<<endl;
+    TestAlgorithms(10000,-1.2,1.2,0.4,10,1.2 ,1);
+    TestAlgorithms(10000,-2.4,2.4,0.4,10,1.2 ,1);
+    TestAlgorithms(10000,-3.6,3.6,0.4,10,1.2 ,1);
+    TestAlgorithms(10000,-5,5,0.4,10,1.2 ,1);
+    TestAlgorithms(10000,-10,10,0.4,10,1.2 ,1);
+    TestAlgorithms(10000,-15,15,0.4,10,1.2 ,1);
+    TestAlgorithms(10000,-20,20,0.4,10,1.2 ,1);
+    TestAlgorithms(10000,-35,35,0.4,10,1.2 ,1);
+    TestAlgorithms(10000,-50,50,0.4,10,1.2 ,1);
+    cout<<"Zmiana liczby szukanych sasiadow"<<endl;
+    TestAlgorithms(100000,-25,25,0.4,1,1.2 ,1);
+    TestAlgorithms(100000,-25,25,0.4,2,1.2 ,1);
+    TestAlgorithms(100000,-25,25,0.4,3,1.2 ,1);
+    TestAlgorithms(100000,-25,25,0.4,4,1.2 ,1);
+    TestAlgorithms(100000,-25,25,0.4,5,1.2 ,1);
+    TestAlgorithms(100000,-25,25,0.4,10,1.2 ,1);
+    TestAlgorithms(100000,-25,25,0.4,15,1.2 ,1);
+    TestAlgorithms(100000,-25,25,0.4,20,1.2 ,1);
+    TestAlgorithms(100000,-25,25,0.4,25,1.2 ,1);
+    TestAlgorithms(100000,-25,25,0.4,50,1.2 ,1);
+    TestAlgorithms(100000,-25,25,0.4,100,1.2 ,1);
+    TestAlgorithms(100000,-25,25,0.4,200,1.2);
+    TestAlgorithms(100000,-25,25,0.4,350,1.2);
+    TestAlgorithms(100000,-25,25,0.4,500,1.2 ,1);
+    //TestAlgorithms(100000,-25,25,0.4,1000,1.2 ,1);
+    //TestAlgorithms(100000,-25,25,0.4,2000,1.2 ,1);
+    //TestAlgorithms(100000,-25,25,0.4,4000,1.2 ,1);
+    //TestAlgorithms(100000,-25,25,0.4,8000,1.2 ,1);
     cout<<"KONIEC TESTOW"<<endl;
 }
