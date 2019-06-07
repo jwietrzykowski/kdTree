@@ -28,11 +28,17 @@ public:
 
     void setInputCloud(const pcl::PointCloud<PointType>::ConstPtr &pts, float ngridSize);
 
-    std::vector<NNBF::Point> nearestKSearch(const PointType &pt, int numPoints,/* std::vector<int> &nhs, std::vector<float> &sqDist, */float maxDist = 1.0, int sort_method = 0);
+    std::vector<NNBF::Point> nearestKSearch(const PointType &pt, int numPoints,/* std::vector<int> &nhs, std::vector<float> &sqDist, */float maxDist = 1.0);
 
 private:
 
-    unsigned long compIndex(const PointType &pt);
+    inline unsigned long compIndex(const PointType &pt){
+        unsigned long xIndex = (unsigned long) ((pt.x - xBeg)/ gridSize);
+        unsigned long yIndex = (unsigned long) ((pt.y - yBeg)/ gridSize);
+        unsigned long zIndex = (unsigned long) ((pt.z - zBeg)/ gridSize);
+
+        return zIndex * xSize * ySize + yIndex * xSize + xIndex;
+    }
 
 
     std::vector<Point> voxelGrid;
