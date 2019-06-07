@@ -22,7 +22,11 @@ public:
         float x, y, z;
     };
 
+    NNBF(float ixMin, float ixMax, float iyMin, float iyMax, float izMin, float izMax, float igridSize);
+
     NNBF(const pcl::PointCloud<PointType>::ConstPtr &pts, float igridSize);
+
+    void setInputCloud(const pcl::PointCloud<PointType>::ConstPtr &pts, float ngridSize);
 
     std::vector<NNBF::Point> nearestKSearch(const PointType &pt, int numPoints,/* std::vector<int> &nhs, std::vector<float> &sqDist, */float maxDist = 1.0, int sort_method = 0);
 
