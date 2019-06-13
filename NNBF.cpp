@@ -74,11 +74,7 @@ void NNBF::setInputCloud(const pcl::PointCloud<PointType>::ConstPtr &pts, float 
     memset(voxelGrid.data(), 0, xSize * ySize * zSize * sizeof(Point));
 
     //add points to vector
-    for (unsigned int i = 0; i < pts->points.size(); i++) {
-//        xIndex = (unsigned long) ((pts->points[i].x - xBeg)/ gridSize);
-//        yIndex = (unsigned long) ((pts->points[i].y - yBeg)/ gridSize);
-//        zIndex = (unsigned long) ((pts->points[i].z - zBeg)/ gridSize);
-//        idx = zIndex * xSize * ySize + yIndex * xSize + xIndex;
+    for(unsigned int i = 0; i < pts->points.size(); i++) {
         unsigned long idx = compIndex(pts->points[i]);
         voxelGrid[idx].x = pts->points[i].x;
         voxelGrid[idx].y = pts->points[i].y;
@@ -88,12 +84,35 @@ void NNBF::setInputCloud(const pcl::PointCloud<PointType>::ConstPtr &pts, float 
     }
 }
 
-std::vector<NNBF::Point> NNBF::nearestKSearch(const PointType &_pt, int numPoints, float maxDist)
+void NNBF::mergeCloud(const pcl::PointCloud<PointType>::ConstPtr &pts) {
+    for(unsigned int i = 0; i < pts->points.size(); i++) {
+        unsigned long idx = compIndex(pts->points[i]);
+
+        if(voxelGrid[idx].flag == 0){
+            voxelGrid[idx].x = pts->points[i].x;
+            voxelGrid[idx].y = pts->points[i].y;
+            voxelGrid[idx].z = pts->points[i].z;
+
+            voxelGrid[idx].flag = 1;
+        }
+        else if(voxelGrid[idx].flag == 1) {
+            // assuming only one point per voxel in new cloud, so simple average of both points is enough
+            voxelGrid[idx].x = (voxelGrid[idx].x + pts->points[i].x) / 2;
+            voxelGrid[idx].y = (voxelGrid[idx].y + pts->points[i].y) / 2;
+            voxelGrid[idx].z = (voxelGrid[idx].z + pts->points[i].z) / 2;
+        }
+    }
+}
+
+std::vector<NNBF::Point> NNBF::nearestKSearch(const PointType &_pt, int numPoints, std::vector<int> &nhs, std::vector<float> &sqDist, float maxDist)
 {
     NNBF::Point pt;
     pt.x = _pt.x;
     pt.y = _pt.y;
     pt.z = _pt.z;
+
+    nhs.clear();
+    sqDist.clear();
 
     //calculate indexes to check
     unsigned long xIndexMin,xIndexMax,yIndexMin,yIndexMax,zIndexMin,zIndexMax;
@@ -107,26 +126,25 @@ std::vector<NNBF::Point> NNBF::nearestKSearch(const PointType &_pt, int numPoint
 
 
     //brute force search
-    unsigned long currentIndex;
-    pair <double, unsigned long> distIdx;
-    double xdist,ydist,zdist;
+//    unsigned long currentIndex;
+//    pair <float, unsigned long> distIdx;
+//    float xdist,ydist,zdist;
 
-    priority_queue<pair<double, unsigned long>> qu;
+    priority_queue<pair<float, unsigned long>> qu;
     for(unsigned long i = xIndexMin; i < xIndexMax; i++)
     {
         for(unsigned long j = yIndexMin; j < yIndexMax; j++)
         {
             for(unsigned long k = zIndexMin; k < zIndexMax; k++)
             {
-                currentIndex = xSize*ySize * k + xSize * j + i;
+                unsigned long currentIndex = xSize*ySize * k + xSize * j + i;
                 if(voxelGrid[currentIndex].flag == 1)
                 {
                     //calculate distance
-                    xdist = (pt.x - voxelGrid[currentIndex].x) * (pt.x - voxelGrid[currentIndex].x);
-                    ydist = (pt.y - voxelGrid[currentIndex].y) * (pt.y - voxelGrid[currentIndex].y);
-                    zdist = (pt.z - voxelGrid[currentIndex].z) * (pt.z - voxelGrid[currentIndex].z);
-                    distIdx.first = xdist + ydist + zdist;
-                    distIdx.second = currentIndex;
+                    float xdist = (pt.x - voxelGrid[currentIndex].x) * (pt.x - voxelGrid[currentIndex].x);
+                    float ydist = (pt.y - voxelGrid[currentIndex].y) * (pt.y - voxelGrid[currentIndex].y);
+                    float zdist = (pt.z - voxelGrid[currentIndex].z) * (pt.z - voxelGrid[currentIndex].z);
+                    pair <float, unsigned long> distIdx(xdist + ydist + zdist, currentIndex);
 
                     if(distIdx.first < maxDist*maxDist) {
                         if(qu.size() >= numPoints) {
@@ -149,10 +167,13 @@ std::vector<NNBF::Point> NNBF::nearestKSearch(const PointType &_pt, int numPoint
 
     while(!qu.empty()){
         results.push_back(voxelGrid[qu.top().second]);
+        sqDist.push_back(qu.top().first);
         qu.pop();
     }
     reverse(results.begin(), results.end());
 
     return results;
 }
+
+
 

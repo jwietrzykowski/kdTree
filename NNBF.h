@@ -28,7 +28,9 @@ public:
 
     void setInputCloud(const pcl::PointCloud<PointType>::ConstPtr &pts, float ngridSize);
 
-    std::vector<NNBF::Point> nearestKSearch(const PointType &pt, int numPoints,/* std::vector<int> &nhs, std::vector<float> &sqDist, */float maxDist = 1.0);
+    void mergeCloud(const pcl::PointCloud<PointType>::ConstPtr &pts);
+
+    std::vector<NNBF::Point> nearestKSearch(const PointType &pt, int numPoints, std::vector<int> &nhs, std::vector<float> &sqDist, float maxDist = 1.0);
 
 private:
 
